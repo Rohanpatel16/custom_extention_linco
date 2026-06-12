@@ -91,6 +91,15 @@
           <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it</option>
         </select>
 
+        <label class="field-label" for="userName-input">Your Name</label>
+        <input type="text" class="field-input" id="userName-input" placeholder="e.g. Rohan..." />
+
+        <label class="field-label" for="userCompany-input">Your Company Name</label>
+        <input type="text" class="field-input" id="userCompany-input" placeholder="e.g. Linco Staffing..." />
+
+        <label class="field-label" for="userTitle-input">Your Job Title</label>
+        <input type="text" class="field-input" id="userTitle-input" placeholder="e.g. Sales Manager..." />
+
         <label class="field-label" for="persona-input">Your Persona</label>
         <textarea class="field-textarea" id="persona-input" rows="3" placeholder="e.g. I'm a ML researcher at Google looking for collaboration…"></textarea>
 
@@ -98,7 +107,7 @@
         <textarea class="field-textarea" id="pitch-input" rows="3" placeholder="e.g. Premium recruitment and staffing services to help scale engineering teams…"></textarea>
 
         <label class="field-label" for="prompt-input">Custom Prompt Template</label>
-        <textarea class="field-textarea" id="prompt-input" rows="4" placeholder="Configure how the AI writes messages. Placeholders: {{instruction}}, {{constraint}}, {{tone}}, {{length_guide}}, {{language_instruction}}, {{profile_summary}}, {{persona_section}}"></textarea>
+        <textarea class="field-textarea" id="prompt-input" rows="4" placeholder="Configure how the AI writes messages. Placeholders: {{instruction}}, {{constraint}}, {{tone}}, {{length_guide}}, {{language_instruction}}, {{profile_summary}}, {{persona_section}}, {{my name}}, {{company name}}, {{job title}}"></textarea>
 
         <button class="save-settings-btn" id="save-settings-btn">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">

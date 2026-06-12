@@ -1,0 +1,16 @@
+{
+  "name": "linco",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Linco — LinkedIn Profile Extractor & AI Connection Generator",
+  "scripts": {
+    "build": "esbuild extension/src/popup.js --bundle --outfile=extension/popup.js --format=iife --platform=browser",
+    "watch": "esbuild extension/src/popup.js --bundle --outfile=extension/popup.js --format=iife --platform=browser --watch"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,23 @@
+# Dependency directories
+node_modules/
+
+# Large log files and snippet files
+*.txt
+*.har
+*.json
+!package.json
+!package-lock.json
+!extension/manifest.json
+
+# HTML files (except popup.html)
+*.html
+!extension/popup.html
+
+# Markdown files (except README.md)
+*.md
+!README.md
+
+# Editor and agent folders
+.agent/
+.claude/
+.gemini/

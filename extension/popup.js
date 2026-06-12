@@ -18254,7 +18254,7 @@ ${p.description}`);
     toggleKeyBtn.addEventListener("click", () => {
       apiKeyInput.type = apiKeyInput.type === "password" ? "text" : "password";
     });
-    chrome.storage.local.get(["geminiApiKey", "geminiModel", "userPersona", "customPrompt", "servicesPitch"], (result) => {
+    chrome.storage.local.get(["geminiApiKey", "geminiModel", "userPersona", "customPrompt", "servicesPitch", "userName", "userCompany", "userTitle"], (result) => {
       if (result.geminiApiKey) {
         apiKeyInput.value = result.geminiApiKey;
       }
@@ -18266,6 +18266,15 @@ ${p.description}`);
       }
       if (result.servicesPitch) {
         document.getElementById("pitch-input").value = result.servicesPitch;
+      }
+      if (result.userName) {
+        document.getElementById("userName-input").value = result.userName;
+      }
+      if (result.userCompany) {
+        document.getElementById("userCompany-input").value = result.userCompany;
+      }
+      if (result.userTitle) {
+        document.getElementById("userTitle-input").value = result.userTitle;
       }
       const defaultPrompt = `You are a world-class LinkedIn networking copywriter. Your messages get replies because they feel genuinely personal \u2014 never templated.
 
@@ -18297,6 +18306,9 @@ Write the message now.`;
         geminiModel: document.getElementById("model-select").value,
         userPersona: document.getElementById("persona-input").value.trim(),
         servicesPitch: document.getElementById("pitch-input").value.trim(),
+        userName: document.getElementById("userName-input").value.trim(),
+        userCompany: document.getElementById("userCompany-input").value.trim(),
+        userTitle: document.getElementById("userTitle-input").value.trim(),
         customPrompt: document.getElementById("prompt-input").value.trim()
       };
       chrome.storage.local.set(settings, () => {
@@ -18342,7 +18354,7 @@ Write the message now.`;
       if (generatePrepBtn) generatePrepBtn.disabled = true;
     }
   }
-  function buildPrompt(profileData, persona, customPrompt) {
+  function buildPrompt(profileData, persona, customPrompt, userName, userCompany, userTitle) {
     let profileSummary = "";
     if (profileData.name) profileSummary += `Name: ${profileData.name}
 `;
@@ -18484,7 +18496,10 @@ THEIR PROFILE:
 {{persona_section}}
 Write the message now.`;
     }
-    return promptTemplate.replace(/\{\{instruction\}\}/g, selected.instruction).replace(/\{\{constraint\}\}/g, selected.constraint).replace(/\{\{tone\}\}/g, tone).replace(/\{\{length_guide\}\}/g, lengthGuide[length] || lengthGuide.medium).replace(/\{\{language_instruction\}\}/g, languageInstruction).replace(/\{\{profile_summary\}\}/g, profileSummary).replace(/\{\{persona_section\}\}/g, personaSection);
+    const myName = userName || "[My Name]";
+    const companyName = userCompany || "[My Company]";
+    const jobTitle = userTitle || "[My Job Title]";
+    return promptTemplate.replace(/\{\{instruction\}\}/g, selected.instruction).replace(/\{\{constraint\}\}/g, selected.constraint).replace(/\{\{tone\}\}/g, tone).replace(/\{\{length_guide\}\}/g, lengthGuide[length] || lengthGuide.medium).replace(/\{\{language_instruction\}\}/g, languageInstruction).replace(/\{\{profile_summary\}\}/g, profileSummary).replace(/\{\{persona_section\}\}/g, personaSection).replace(/\{\{my name\}\}/gi, myName).replace(/\{\{company name\}\}/gi, companyName).replace(/\{\{job title\}\}/gi, jobTitle);
   }
   var isGenerating = false;
   var typewriterQueue = "";
@@ -18525,7 +18540,7 @@ Write the message now.`;
     const charCount = document.getElementById("char-count");
     const generateBtn = document.getElementById("generate-btn");
     const settings = await new Promise((resolve) => {
-      chrome.storage.local.get(["geminiApiKey", "geminiModel", "userPersona", "customPrompt"], resolve);
+      chrome.storage.local.get(["geminiApiKey", "geminiModel", "userPersona", "customPrompt", "userName", "userCompany", "userTitle"], resolve);
     });
     if (!settings.geminiApiKey) {
       aiErrorBox.textContent = "Please enter your Gemini API Key in Settings above.";
@@ -18555,7 +18570,14 @@ Write the message now.`;
       const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
       const model = settings.geminiModel || "gemma-4-31b-it";
       const persona = settings.userPersona || "";
-      const prompt = buildPrompt(currentProfileData, persona, settings.customPrompt);
+      const prompt = buildPrompt(
+        currentProfileData,
+        persona,
+        settings.customPrompt,
+        settings.userName,
+        settings.userCompany,
+        settings.userTitle
+      );
       const config = {};
       if (model === "gemini-3.1-flash-lite") {
         config.thinkingConfig = {
@@ -18618,7 +18640,7 @@ Write the message now.`;
       span.textContent = text;
     }
   }
-  function buildPrepPrompt(profileData, servicesPitch) {
+  function buildPrepPrompt(profileData, servicesPitch, userName, userCompany, userTitle) {
     let profileSummary = "";
     if (profileData.name) profileSummary += `Name: ${profileData.name}
 `;
@@ -18664,33 +18686,45 @@ Recent Activity:
       });
     }
     const pitch = servicesPitch || "Premium recruitment and staffing services.";
-    return `You are an elite Sales Development Representative (SDR) and cold calling coach. 
-Your goal is to prepare a sales manager with context-driven talking points, hiring triggers, and high-impact verbal icebreakers for a cold call based on a lead's LinkedIn profile.
+    const callerName = userName || "[My Name]";
+    const callerCompany = userCompany || "[My Company]";
+    const callerTitle = userTitle || "Sales Manager";
+    const prompt = `You are an elite Sales Development Representative (SDR) and cold calling coach. 
+Your goal is to prepare a sales manager with context-driven talking points, hiring triggers, and high-impact verbal icebreakers and elevator pitches for a cold call based on a lead's LinkedIn profile.
 
-OUR SERVICES & OFFERING:
-${pitch}
+OUR COMPANY & SERVICES DETAILS:
+- Company Name: {{company name}}
+- Representative Name: {{my name}}
+- Representative Job Title: {{job title}}
+- Services Offered / Pitch: ${pitch}
 
 THE LEAD's PROFILE DATA:
 ${profileSummary}
 
-Analyze the profile to extract hiring signals, specific hooks, and a live call pitch.
+Analyze the profile to extract hiring signals, specific hooks, and an elevator pitch.
 
 RULES FOR THE OUTPUT:
 - Write ONLY the requested sections. Do not include introductory or concluding remarks.
 - Keep all suggestions conversation-friendly\u2014write them exactly as they should be spoken (no formal corporate email phrases).
+- The icebreakers must fit this exact live call flow:
+  Caller: "Hey, am I talking to {{Name}}?"
+  Lead: "Yes, can I know who I'm talking with?"
+  Caller: [ICEBREAKER HERE]
+- CRITICAL: You MUST replace any reference to the caller's name with "{{my name}}", company name with "{{company name}}", and job title with "{{job title}}" directly in the output. Do NOT output generic placeholders like '[My Name]', '[My Company]', '[Company Name]', '[Your Name]', '[Your Company]', '[Job Title]', or '[My Job Title]'.
 - Avoid low-status phrases like "I noticed that...", "I was wondering...", or "I'd love to help you...".
 - Enforce the exact structure below.
 
 ### HIRING SIGNALS
-- **[Trigger Name]:** [1-2 sentences. Extract concrete signals indicating growth, active hiring, new office openings, tech stack changes, or talent gaps. Be specific about the department or roles affected.]
+- **[Trigger Name]:** [1-2 sentences. Extract concrete signals indicating growth, active hiring, new office openings, tech stack changes, or talent gaps.]
 - **[Operational/Role Context]:** [1-2 sentences. Explain how their specific role, background, or team structure makes them the right target for our offering.]
 
 ### ICEBREAKERS
-1. "[Icebreaker 1: Spoken-friendly hook referencing a recent post, shared post, promotion, or company update. Keep it under 20 words.]"
-2. "[Icebreaker 2: Spoken-friendly hook referencing their career history or a specific skill. Keep it under 20 words.]"
+1. "Hey [Lead First Name], it's {{my name}}, the {{job title}} at {{company name}}. I'm calling because I saw your recent post about hiring a [role mentioned in profile, e.g., Electrical CAD Designer] and wanted to reach out specifically about that niche."
+2. "Hey [Lead First Name], it's {{my name}}, the {{job title}} at {{company name}}. I saw you've scaled the [department/function] at [Lead Company] over the last [years] and recently [recent achievement, e.g., wrapped up your MBA], so I figured you're the right person to talk to about your current hiring roadmap."
 
-CALL TRACK PITCH
-"[Suggested live call script. Keep it to 2-3 sentences max. State their probable challenge based on their hiring signals, introduce the value hook naturally, and close with a low-friction question.]"`;
+ELEVATOR PITCH
+"[A 2-sentence catchy pitch linking their situation directly to our offering. Use the caller company name '{{company name}}', job title '{{job title}}', and representative details if appropriate. Keep it to a human, speaking tone. Example: 'Since you're scaling up right now, we at {{company name}} specialize in helping recruitment teams reduce time-to-fill...']"`;
+    return prompt.replace(/\{\{my name\}\}/g, callerName).replace(/\{\{company name\}\}/g, callerCompany).replace(/\{\{job title\}\}/g, callerTitle);
   }
   var isPrepGenerating = false;
   async function generateCallPrep() {
@@ -18701,7 +18735,12 @@ CALL TRACK PITCH
     const prepText = document.getElementById("prep-text");
     const generatePrepBtn = document.getElementById("generate-prep-btn");
     const settings = await new Promise((resolve) => {
-      chrome.storage.local.get(["geminiApiKey", "geminiModel", "servicesPitch"], resolve);
+      chrome.storage.local.get(["geminiApiKey", "geminiModel", "servicesPitch", "userName", "userCompany", "userTitle"], resolve);
+    });
+    console.log("Linco Call Prep Settings Loaded:", {
+      userName: settings.userName,
+      userCompany: settings.userCompany,
+      userTitle: settings.userTitle
     });
     if (!settings.geminiApiKey) {
       prepErrorBox.textContent = "Please enter your Gemini API Key in Settings above.";
@@ -18720,7 +18759,13 @@ CALL TRACK PITCH
     try {
       const ai = new GoogleGenAI({ apiKey: settings.geminiApiKey });
       const model = settings.geminiModel || "gemma-4-31b-it";
-      const prompt = buildPrepPrompt(currentProfileData, settings.servicesPitch);
+      const prompt = buildPrepPrompt(
+        currentProfileData,
+        settings.servicesPitch,
+        settings.userName,
+        settings.userCompany,
+        settings.userTitle
+      );
       const config = {};
       if (model === "gemini-3.1-flash-lite") {
         config.thinkingConfig = {
@@ -18755,9 +18800,24 @@ CALL TRACK PITCH
           }
         ]
       });
+      let fullText = "";
       for await (const chunk of response) {
         if (chunk.text) {
-          prepText.textContent += chunk.text;
+          fullText += chunk.text;
+          const cleanName = settings.userName || "";
+          const cleanCompany = settings.userCompany || "";
+          const cleanTitle = settings.userTitle || "";
+          let cleaned = fullText;
+          if (cleanName) {
+            cleaned = cleaned.replace(/\[My Name\]/gi, cleanName).replace(/\[Your Name\]/gi, cleanName);
+          }
+          if (cleanCompany) {
+            cleaned = cleaned.replace(/\[My Company\]/gi, cleanCompany).replace(/\[Your Company\]/gi, cleanCompany).replace(/\[Company Name\]/gi, cleanCompany);
+          }
+          if (cleanTitle) {
+            cleaned = cleaned.replace(/\[My Job Title\]/gi, cleanTitle).replace(/\[Your Job Title\]/gi, cleanTitle).replace(/\[Job Title\]/gi, cleanTitle);
+          }
+          prepText.textContent = cleaned;
           prepText.scrollTop = prepText.scrollHeight;
         }
       }

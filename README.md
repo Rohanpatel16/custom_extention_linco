@@ -10,10 +10,11 @@ Linco is a premium, visual-rich Chrome Extension that streamlines lead prospecti
 - **Message Generator**: Writes highly personalized connection requests, InMail, follow-ups, and cold outreach.
   - Supports configurable **Tones** (Professional, Casual, Friendly, Formal, Witty).
   - Supports custom **Lengths** and multi-lingual output.
+  - Supports dynamic template placeholders: `{{my name}}`, `{{company name}}`, and `{{job title}}` inside custom prompt templates.
 - **Sales Call Prep (On-Demand)**: Generates a prep guide specifically tailored to your company's service offerings.
   - **Hiring Signals**: Focuses on active triggers, team expansion, and tech growth.
   - **Live Icebreakers**: Structured as spoken-friendly hooks, ready to use on call.
-  - **Call Track Pitch**: A 1-2 sentence peer-to-peer hook linking the lead's situation directly to your offer.
+  - **Elevator Pitch**: A 1-2 sentence peer-to-peer hook linking the lead's situation directly to your offer (supporting automatic placeholder substitution for your Name, Company, and Job Title).
 - **Premium UI/UX**: Sleek, responsive interface supporting system-matched dark and light themes, and instant clipboard copying.
 
 ---
@@ -37,8 +38,9 @@ Since this is a custom extension, you can install it locally in Developer Mode:
 1. Open the Linco popup.
 2. Click the **Settings Gear Icon** in the top right.
 3. Paste your **Gemini API Key**.
-4. Set your **Persona** (who you are) and your **Services / Offer Pitch** (what you sell, e.g. *"We provide tech recruitment and staffing services to help scale engineering teams"*).
-5. Click **Save Settings**.
+4. Set your **Name**, **Company Name**, **Job Title**, **Persona** (who you are), and your **Services / Offer Pitch** (what you sell, e.g. *"We provide tech recruitment and staffing services to help scale engineering teams"*).
+5. (Optional) Customize the prompt template using placeholders like `{{my name}}`, `{{company name}}`, and `{{job title}}` to dynamically insert your identity.
+6. Click **Save Settings**.
 
 ### 2. Message Outlining & Calling
 1. Navigate to any LinkedIn profile page (e.g. `https://www.linkedin.com/in/username/`).
