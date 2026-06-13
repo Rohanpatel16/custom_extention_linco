@@ -837,7 +837,7 @@ async function generateConnectionRequest() {
           googleSearch: {}
         }
       ];
-    } else if (model.startsWith('gemma-') || model.startsWith('gemini-')) {
+    } else if (model.startsWith('gemma-')) {
       config.thinkingConfig = {
         thinkingLevel: 'MINIMAL',
       };
@@ -1039,7 +1039,7 @@ async function generateCallPrep() {
           googleSearch: {}
         }
       ];
-    } else if (model.startsWith('gemma-') || model.startsWith('gemini-')) {
+    } else if (model.startsWith('gemma-')) {
       config.thinkingConfig = {
         thinkingLevel: 'MINIMAL',
       };

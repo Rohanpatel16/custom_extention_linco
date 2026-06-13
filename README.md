@@ -11,6 +11,11 @@ Linco is a premium, visual-rich Chrome Extension that streamlines lead prospecti
   - Supports configurable **Tones** (Professional, Casual, Friendly, Formal, Witty).
   - Supports custom **Lengths** and multi-lingual output.
   - Supports dynamic template placeholders: `{{my name}}`, `{{company name}}`, and `{{job title}}` inside custom prompt templates.
+- **Interactive AI Chat Reply**: Injects a sparkle (`✨`) action button directly into LinkedIn chat windows.
+  - Automatically extracts conversation history context (last 8 messages).
+  - Displays a glassmorphic verification panel for reviewing drafts.
+  - Allows manual editing or instruction-based regeneration (e.g., *"tweak to ask for a coffee next Tuesday"*).
+  - Safely injects into LinkedIn input fields only after explicit user approval.
 - **Sales Call Prep (On-Demand)**: Generates a prep guide specifically tailored to your company's service offerings.
   - **Hiring Signals**: Focuses on active triggers, team expansion, and tech growth.
   - **Live Icebreakers**: Structured as spoken-friendly hooks, ready to use on call.
@@ -47,6 +52,14 @@ Since this is a custom extension, you can install it locally in Developer Mode:
 2. Click the Linco icon.
 3. **Message Gen Tab**: Automatically extracts the profile and generates a context-rich connection request in under 5 seconds.
 4. **Call Prep Tab**: Click **Generate Call Prep** to instantly get an actionable phone talking-track before you dial the lead.
+
+### 3. AI Chat Reply Drawer (Verification & Approval)
+1. Open any active LinkedIn messaging popup bubble or the full-screen messaging layout.
+2. Locate the sparkle (`✨`) action button injected into the attachment footer tray of the chat composer.
+3. Click the button. A glassmorphic **Linco AI Draft** panel will slide open above the compose box showing the generated reply (scraped from the last 8 messages of history).
+4. **Edit & Approve**: Tweak the response inside the text area, and click **Approve & Insert** to load the text directly into LinkedIn's textbox.
+5. **Regenerate with Instructions**: Type custom guidance (e.g. *"ask for coffee next week"*) inside the context input bar and click **Regenerate** to rewrite the draft.
+6. **Cancel**: Click the **`×`** close button to dismiss the draft panel without modifying the textbox.
 
 ---
 

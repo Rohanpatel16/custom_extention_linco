@@ -704,3 +704,810 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async
   }
 });
+
+// ─── Messaging Popup Integration (Linco v2 Prototype) ──────────────────────
+
+function initMessagingIntegration() {
+  console.log('[Linco] Initializing messaging integration observer...', {
+    url: window.location.href,
+    isTopFrame: window.parent === window,
+    documentTitle: document.title,
+    hasBody: !!document.body
+  });
+
+  // Periodic check as a backup and initial run
+  setInterval(checkAndInjectButtons, 1000);
+
+  // Mutation observer for real-time injection
+  const observer = new MutationObserver((mutations) => {
+    let shouldCheck = false;
+    for (const mutation of mutations) {
+      if (mutation.addedNodes.length > 0) {
+        shouldCheck = true;
+        break;
+      }
+    }
+    if (shouldCheck) {
+      checkAndInjectButtons();
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// Deep DOM Query Helpers (traverses Same-Origin Iframes)
+function querySelectorAllDeep(selector, root = document) {
+  if (!root) return [];
+  let elements = Array.from(root.querySelectorAll(selector));
+
+  // Traverse Same-Origin Iframes
+  try {
+    const iframes = root.querySelectorAll('iframe');
+    for (const iframe of iframes) {
+      try {
+        if (iframe.contentDocument) {
+          elements = elements.concat(querySelectorAllDeep(selector, iframe.contentDocument));
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  return elements;
+}
+
+let diagnosticRunCount = 0;
+
+function checkAndInjectButtons() {
+  diagnosticRunCount++;
+  
+  const currentUrl = window.location.href;
+  const isTop = window.parent === window;
+
+  if (diagnosticRunCount % 5 === 0) {
+    // Collect all iframe details on page
+    const iframesInfo = [];
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach((iframe, i) => {
+        let isSameOrigin = false;
+        let iframeUrl = '';
+        try {
+          if (iframe.contentDocument) {
+            isSameOrigin = true;
+            iframeUrl = iframe.contentWindow.location.href;
+          }
+        } catch (e) {
+          iframeUrl = iframe.src || 'cross-origin';
+        }
+        iframesInfo.push({
+          index: i,
+          id: iframe.id || 'no-id',
+          className: iframe.className || 'no-class',
+          src: iframeUrl,
+          sameOrigin: isSameOrigin
+        });
+      });
+    } catch (e) {}
+
+    // Find all contenteditable elements
+    const editablesInfo = [];
+    try {
+      const editables = querySelectorAllDeep('[contenteditable="true"]');
+      editables.forEach((el, i) => {
+        editablesInfo.push({
+          index: i,
+          tagName: el.tagName,
+          id: el.id || 'no-id',
+          className: el.className || 'no-class',
+          ariaLabel: el.getAttribute('aria-label') || 'no-label',
+          placeholder: el.getAttribute('data-placeholder') || el.getAttribute('placeholder') || 'no-placeholder'
+        });
+      });
+    } catch (e) {}
+
+    // Find sample elements with msg/convo classes
+    const msgClassesInfo = [];
+    try {
+      const allElements = document.querySelectorAll('*');
+      let count = 0;
+      for (const el of allElements) {
+        const classes = Array.from(el.classList);
+        const hasMsgClass = classes.some(c => c.toLowerCase().includes('msg') || c.toLowerCase().includes('convo'));
+        if (hasMsgClass && count < 20) {
+          msgClassesInfo.push({
+            tagName: el.tagName,
+            id: el.id || 'no-id',
+            className: el.className
+          });
+          count++;
+        }
+      }
+    } catch (e) {}
+
+    console.log('[Linco] Deep Diagnostics:', {
+      url: currentUrl,
+      isTopFrame: isTop,
+      documentTitle: document.title,
+      totalIframes: iframesInfo.length,
+      iframes: iframesInfo,
+      totalContenteditables: editablesInfo.length,
+      editables: editablesInfo,
+      sampleMsgElements: msgClassesInfo,
+      convoWrappers: querySelectorAllDeep('.msg-convo-wrapper').length,
+      msgForms: querySelectorAllDeep('.msg-form').length
+    });
+  }
+
+  // 1. Find all contenteditable candidates
+  const allEditables = querySelectorAllDeep('[contenteditable="true"]');
+
+  // 2. Filter for LinkedIn message composer candidates
+  const msgEditors = allEditables.filter(el => {
+    // Match by class names
+    if (el.classList.contains('msg-form__contenteditable')) return true;
+
+    // Match by aria-label or placeholder
+    const label = (el.getAttribute('aria-label') || '').toLowerCase();
+    const placeholder = (el.getAttribute('data-placeholder') || el.getAttribute('placeholder') || '').toLowerCase();
+    if (label.includes('message') || placeholder.includes('message')) return true;
+    if (label.includes('write a') || placeholder.includes('write a')) return true;
+
+    // Check parent or grandparent class names
+    let parent = el.parentElement;
+    for (let i = 0; i < 4 && parent; i++) {
+      if (parent.classList.contains('msg-form') || parent.classList.contains('msg-convo-wrapper')) {
+        return true;
+      }
+      parent = parent.parentElement;
+    }
+    return false;
+  });
+
+  console.log('[Linco] checkAndInjectButtons tick. Message editors found:', msgEditors.length);
+
+  // 3. Process each editor and inject button
+  msgEditors.forEach((editor, idx) => {
+    // Find closest container that has the action footer or attachments
+    let container = editor.closest('form, .msg-form, .msg-convo-wrapper, [role="dialog"]');
+    if (!container) {
+      // Fallback: use grandparent
+      container = editor.parentElement ? editor.parentElement.parentElement : null;
+    }
+
+    if (!container) {
+      console.warn(`[Linco] Editor ${idx}: Could not find container for editor!`);
+      return;
+    }
+
+    // Try to find the left actions attachment tray or footer
+    let leftActions = container.querySelector('.msg-form__left-actions');
+    let expandBtnWrapper = container.querySelector('.msg-form__expand-btn-wrapper');
+    let footer = container.querySelector('.msg-form__footer, footer');
+
+    // Fallback: If not found by class, query for any attachment icon/button container
+    if (!leftActions && footer) {
+      const buttonContainers = Array.from(footer.querySelectorAll('div, span')).filter(div => {
+        return div.querySelectorAll('button, input[type="file"]').length > 0;
+      });
+      if (buttonContainers.length > 0) {
+        buttonContainers.sort((a, b) => {
+          const aCount = a.querySelectorAll('button, input[type="file"]').length;
+          const bCount = b.querySelectorAll('button, input[type="file"]').length;
+          return bCount - aCount;
+        });
+        leftActions = buttonContainers[0];
+      }
+    }
+
+    // Fallback 2: Check if there's any file input container or button container inside the entire container
+    if (!leftActions) {
+      const attachmentDivs = Array.from(container.querySelectorAll('div[class*="attachment"], div[class*="actions"], div[class*="footer"]'));
+      if (attachmentDivs.length > 0) {
+        leftActions = attachmentDivs[0];
+      }
+    }
+
+    const targetContainer = leftActions || expandBtnWrapper || editor.parentElement;
+    if (!targetContainer) {
+      console.warn(`[Linco] Editor ${idx}: Could not find target container for injection!`);
+      return;
+    }
+
+    // Check if we already injected our button in this target container
+    if (targetContainer.querySelector('.linco-inject-btn')) {
+      return;
+    }
+
+    // Create Linco button
+    const lincoBtn = document.createElement('button');
+    lincoBtn.type = 'button';
+    lincoBtn.className = 'msg-form__footer-action artdeco-button artdeco-button--tertiary artdeco-button--circle artdeco-button--muted m0 artdeco-button--1 linco-inject-btn';
+    lincoBtn.title = 'Generate AI Reply (Linco)';
+    lincoBtn.innerHTML = '✨';
+
+    // Style the button
+    if (targetContainer === leftActions || targetContainer.classList.contains('msg-form__left-actions')) {
+      Object.assign(lincoBtn.style, {
+        fontSize: '16px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        border: 'none',
+        background: 'transparent',
+        outline: 'none',
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        margin: '0 4px'
+      });
+    } else {
+      Object.assign(lincoBtn.style, {
+        border: 'none',
+        background: 'linear-gradient(135deg, #0a66c2, #004182)',
+        color: 'white',
+        borderRadius: '50%',
+        width: '28px',
+        height: '28px',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: '8px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+        fontSize: '14px',
+        outline: 'none'
+      });
+    }
+
+    // Click handler
+    lincoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleLincoBtnClick(editor, container);
+    });
+
+    // Append/Insert
+    if (leftActions) {
+      leftActions.appendChild(lincoBtn);
+      console.log(`[Linco] Editor ${idx}: Injected button into action tray successfully.`);
+    } else if (expandBtnWrapper) {
+      expandBtnWrapper.insertBefore(lincoBtn, expandBtnWrapper.firstChild);
+      console.log(`[Linco] Editor ${idx}: Injected button into expand wrapper successfully.`);
+    } else {
+      editor.parentElement.appendChild(lincoBtn);
+      console.log(`[Linco] Editor ${idx}: Injected button into editor parent fallback successfully.`);
+    }
+  });
+}
+
+function handleLincoBtnClick(editor, container) {
+  // 1. Read API Key & settings from storage
+  chrome.storage.local.get(['geminiApiKey', 'geminiModel', 'userName', 'userCompany', 'servicesPitch'], async (settings) => {
+    if (!settings.geminiApiKey) {
+      alert("Please enter your Gemini API Key in Linco Extension Settings first.");
+      return;
+    }
+
+    // Find or create approval panel
+    let panel = container.querySelector('.linco-approval-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'linco-approval-panel';
+      if (isDarkMode()) {
+        panel.classList.add('linco-dark-mode');
+      }
+      
+      panel.innerHTML = `
+        <div class="linco-approval-header">
+          <span>✨ Linco AI Draft</span>
+          <button class="linco-close-btn" type="button">×</button>
+        </div>
+        <textarea class="linco-approval-textarea" placeholder="Generating reply draft..."></textarea>
+        <input class="linco-instruction-input" type="text" placeholder="Add custom context / what you want to say..." />
+        <div class="linco-approval-btn-container">
+          <span class="linco-status-msg">Analyzing chat...</span>
+          <button class="linco-btn linco-btn-secondary linco-regen-btn" type="button" disabled>Regenerate</button>
+          <button class="linco-btn linco-btn-primary linco-approve-btn" type="button" disabled>Approve & Insert</button>
+        </div>
+      `;
+      
+      // Position panel inside container (closest positioning parent)
+      container.style.position = 'relative';
+      container.appendChild(panel);
+    }
+
+    const textarea = panel.querySelector('.linco-approval-textarea');
+    const instructionInput = panel.querySelector('.linco-instruction-input');
+    const statusMsg = panel.querySelector('.linco-status-msg');
+    const regenBtn = panel.querySelector('.linco-regen-btn');
+    const approveBtn = panel.querySelector('.linco-approve-btn');
+    const closeBtn = panel.querySelector('.linco-close-btn');
+
+    // Disable buttons while generating
+    regenBtn.disabled = true;
+    approveBtn.disabled = true;
+    textarea.disabled = true;
+    if (instructionInput) instructionInput.disabled = true;
+    statusMsg.textContent = "Extracting chat history...";
+
+    const closePanel = () => {
+      panel.remove();
+    };
+
+    closeBtn.onclick = (e) => {
+      e.preventDefault();
+      closePanel();
+    };
+
+    const generateDraft = async (customInstruction) => {
+      statusMsg.textContent = "Generating draft...";
+      regenBtn.disabled = true;
+      approveBtn.disabled = true;
+      textarea.disabled = true;
+      if (instructionInput) instructionInput.disabled = true;
+      textarea.placeholder = "Generating reply draft...";
+
+      try {
+        const history = getChatHistory(container);
+        let chatHistoryText = '';
+        history.forEach(h => {
+          chatHistoryText += `[${h.timestamp}] ${h.sender}: ${h.text}\n`;
+        });
+
+        let titleEl = container.querySelector('.msg-overlay-bubble-header__title a span, .msg-thread__link span');
+        if (!titleEl) {
+          const commonParent = container.closest('.msg-overlay-conversation-bubble, .msg-thread, .messaging-thread-layout');
+          if (commonParent) {
+            titleEl = commonParent.querySelector('.msg-overlay-bubble-header__title a span, .msg-entity-lockup__title');
+          }
+        }
+        if (!titleEl) {
+          titleEl = document.querySelector('.msg-thread__title, .msg-entity-lockup__title');
+        }
+        const leadName = titleEl ? titleEl.innerText.trim() : "this connection";
+
+        const prompt = `You are an elite, human-like sales professional drafting a reply in a LinkedIn chat thread.
+Your goal is to write a warm, brief, and contextually relevant reply that continues the conversation naturally.
+
+[SENDER PROFILE (YOU)]
+- Name: ${settings.userName || 'Representative'}
+- Company: ${settings.userCompany || 'our company'}
+- Offer/Services: ${settings.servicesPitch || 'business collaboration'}
+
+[RECIPIENT PROFILE]
+- Name: ${leadName}
+
+[CHAT HISTORY]
+${chatHistoryText || '(No history yet)'}
+${customInstruction ? `\n[USER DIRECTION / CONTEXT]\n- ${customInstruction}\n` : ''}
+[DIRECTIVES]
+1. STYLE: Speak conversationally, exactly as a human typing in a chat window. 
+2. FORMAT: 
+   - Start directly (e.g., "Hi ${leadName.split(' ')[0]}," or respond to their last point).
+   - Write ONLY the message content itself.
+   - NO subject lines, NO email sign-offs (like "Best regards", "Sincerely"), NO signature blocks (like "[My Name] | [My Title]").
+3. LENGTH: Keep it between 1 to 3 short sentences.
+4. CALL TO ACTION: If appropriate, end with a low-friction, conversational next step.
+
+[EXAMPLES]
+Input History:
+[5:54 PM] Lead: "Sounds interesting"
+Instruction: "ask if they want a short call on Tuesday"
+Output: "Great. Do you have 10 minutes for a quick call this coming Tuesday afternoon?"
+
+Input History:
+[2:30 PM] Lead: "Yes, we are currently hiring designers."
+Instruction: "offer help with our styling staffing service"
+Output: "Awesome. We have a few vetted UX designers ready to start. Would you be open to seeing a couple of portfolios?"
+`;
+
+        const model = settings.geminiModel || 'gemma-4-31b-it';
+        const draft = await callGeminiAPI(settings.geminiApiKey, model, prompt);
+        
+        textarea.value = draft.trim();
+        textarea.disabled = false;
+        if (instructionInput) {
+          instructionInput.disabled = false;
+        }
+        statusMsg.textContent = "Draft ready.";
+        regenBtn.disabled = false;
+        approveBtn.disabled = false;
+      } catch (err) {
+        console.error('[Linco] Generation failed:', err);
+        textarea.value = '';
+        textarea.placeholder = `Failed to generate: ${err.message}`;
+        statusMsg.textContent = "Error.";
+        regenBtn.disabled = false;
+        if (instructionInput) instructionInput.disabled = false;
+      }
+    };
+
+    approveBtn.onclick = (e) => {
+      e.preventDefault();
+      const finalReply = textarea.value.trim();
+      if (!finalReply) return;
+
+      // Ingress text to LinkedIn
+      editor.focus();
+      editor.innerHTML = `<p>${finalReply}</p>`;
+
+      // Hide LinkedIn placeholder
+      let placeholder = container.querySelector('.msg-form__placeholder');
+      if (!placeholder) {
+        placeholder = Array.from(container.querySelectorAll('div, span')).find(el => {
+          const txt = (el.textContent || '').trim();
+          const pText = el.getAttribute('data-placeholder') || el.getAttribute('placeholder') || '';
+          return txt.includes('Write a message') || pText.includes('Write a message');
+        });
+      }
+      if (placeholder) {
+        placeholder.style.display = 'none';
+        placeholder.classList.add('is-hidden');
+      }
+
+      triggerInputEvents(editor);
+      closePanel();
+    };
+
+    regenBtn.onclick = (e) => {
+      e.preventDefault();
+      const customInstruction = instructionInput ? instructionInput.value.trim() : '';
+      generateDraft(customInstruction);
+    };
+
+    // Start generation
+    generateDraft();
+  });
+}
+
+function triggerInputEvents(element) {
+  // 1. Dispatch beforeinput event
+  const beforeInputEvent = new InputEvent('beforeinput', {
+    bubbles: true,
+    cancelable: true,
+    inputType: 'insertText',
+    data: element.textContent
+  });
+  element.dispatchEvent(beforeInputEvent);
+
+  // 2. Dispatch input event
+  const inputEvent = new Event('input', {
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(inputEvent);
+
+  // 3. Dispatch change event
+  const changeEvent = new Event('change', {
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(changeEvent);
+
+  // 4. Dispatch keydown/keyup events as a backup for text listeners
+  const keydownEvent = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    code: 'Enter',
+    keyCode: 13,
+    which: 13,
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(keydownEvent);
+
+  const keyupEvent = new KeyboardEvent('keyup', {
+    key: 'Enter',
+    code: 'Enter',
+    keyCode: 13,
+    which: 13,
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(keyupEvent);
+}
+
+function isDarkMode() {
+  return document.documentElement.classList.contains('theme--dark') || 
+         document.documentElement.getAttribute('data-theme') === 'dark' ||
+         window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function getChatHistory(container) {
+  // Try to find the message list container
+  let listContainer = container.querySelector('ul.msg-s-message-list-content, .msg-s-message-list');
+  
+  // If not found in the container, walk up to search in a common parent
+  if (!listContainer) {
+    const commonParent = container.closest('.msg-overlay-conversation-bubble__content-wrapper, .msg-thread, .messaging-thread-layout, [role="main"]');
+    if (commonParent) {
+      listContainer = commonParent.querySelector('ul.msg-s-message-list-content, .msg-s-message-list');
+    }
+  }
+
+  // If still not found, search globally in the document (especially for full-screen messages)
+  if (!listContainer) {
+    listContainer = document.querySelector('ul.msg-s-message-list-content, .msg-s-message-list');
+  }
+
+  if (!listContainer) {
+    console.warn('[Linco] Could not find message list container.');
+    return [];
+  }
+
+  const messageItems = listContainer.querySelectorAll('li.msg-s-message-list__event');
+  const chatHistory = [];
+
+  messageItems.forEach(item => {
+    const senderNameEl = item.querySelector('.msg-s-message-group__name');
+    const timestampEl = item.querySelector('.msg-s-message-group__timestamp');
+    const sender = senderNameEl ? senderNameEl.innerText.trim() : "Connection";
+    const timestamp = timestampEl ? timestampEl.innerText.trim() : "Unknown";
+
+    const messageBodies = item.querySelectorAll('p.msg-s-event-listitem__body');
+    messageBodies.forEach(p => {
+      chatHistory.push({
+        sender: sender,
+        timestamp: timestamp,
+        text: p.innerText.trim()
+      });
+    });
+  });
+  
+  return chatHistory.slice(-8);
+}
+
+async function callGeminiAPI(apiKey, model, promptText) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  
+  const config = {};
+  if (model === 'gemini-3.1-flash-lite') {
+    config.thinkingConfig = {
+      thinkingLevel: 'LOW',
+    };
+  } else if (model === 'gemma-4-26b-a4b-it' || model === 'gemma-4-31b-it') {
+    config.thinkingConfig = {
+      thinkingLevel: 'MINIMAL',
+    };
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: promptText
+        }]
+      }],
+      generationConfig: config
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let parsedErr;
+    try {
+      parsedErr = JSON.parse(errText);
+    } catch(e) {}
+    throw new Error(parsedErr?.error?.message || `HTTP ${response.status}: ${errText}`);
+  }
+
+  const resData = await response.json();
+  const candidates = resData.candidates;
+  if (!candidates || candidates.length === 0) {
+    throw new Error("API returned no response candidates.");
+  }
+  
+  const content = candidates[0].content;
+  if (!content || !content.parts || content.parts.length === 0) {
+    throw new Error("No parts in candidates response.");
+  }
+
+  const textParts = content.parts
+    .filter(part => !part.thought)
+    .map(part => part.text)
+    .join('');
+  
+  if (!textParts) {
+    return content.parts[0].text;
+  }
+  return textParts;
+}
+
+// Inject CSS Styles for Linco Approval Box
+const lincoStyle = document.createElement('style');
+lincoStyle.textContent = `
+  .linco-approval-panel {
+    position: absolute;
+    bottom: 80px;
+    left: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12);
+    z-index: 10000;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    box-sizing: border-box;
+    animation: linco-slide-up 0.25s ease-out;
+  }
+  
+  .linco-dark-mode.linco-approval-panel {
+    background: rgba(30, 30, 35, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+  }
+  
+  .linco-approval-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: #111;
+  }
+  
+  .linco-dark-mode .linco-approval-header {
+    color: #eee !important;
+  }
+  
+  .linco-close-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    color: #666;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .linco-dark-mode .linco-close-btn {
+    color: #aaa !important;
+  }
+  
+  .linco-approval-textarea {
+    width: 100%;
+    height: 90px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    color: #333;
+    box-sizing: border-box;
+  }
+  
+  .linco-dark-mode .linco-approval-textarea {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ddd !important;
+  }
+
+  .linco-instruction-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    color: #333;
+    box-sizing: border-box;
+  }
+  
+  .linco-dark-mode .linco-instruction-input {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ddd !important;
+  }
+  
+  .linco-approval-btn-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .linco-btn {
+    border: none;
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    outline: none;
+  }
+  
+  .linco-btn-primary {
+    background: linear-gradient(135deg, #0a66c2, #004182);
+    color: white;
+  }
+  
+  .linco-btn-primary:hover {
+    background: linear-gradient(135deg, #004182, #002244);
+  }
+  
+  .linco-btn-primary:disabled {
+    background: #ccc;
+    color: #888;
+    cursor: not-allowed;
+  }
+  
+  .linco-btn-secondary {
+    background: rgba(0, 0, 0, 0.05);
+    color: #555;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .linco-dark-mode .linco-btn-secondary {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ccc !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  
+  .linco-btn-secondary:disabled {
+    background: rgba(0, 0, 0, 0.02);
+    color: #aaa;
+    border-color: rgba(0, 0, 0, 0.05);
+    cursor: not-allowed;
+  }
+  
+  .linco-dark-mode .linco-btn-secondary:disabled {
+    background: rgba(255, 255, 255, 0.02) !important;
+    color: #555 !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+  }
+  
+  .linco-btn-secondary:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.1);
+  }
+  
+  .linco-dark-mode .linco-btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15) !important;
+  }
+  
+  .linco-status-msg {
+    font-size: 11px;
+    color: #666;
+    margin-right: auto;
+    align-self: center;
+  }
+  
+  .linco-dark-mode .linco-status-msg {
+    color: #aaa !important;
+  }
+
+  @keyframes linco-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;
+document.head.appendChild(lincoStyle);
+
+// Start the messaging integration automatically
+initMessagingIntegration();
+
+
+

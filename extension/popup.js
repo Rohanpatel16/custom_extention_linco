@@ -18597,7 +18597,7 @@ Write the message now.`;
             googleSearch: {}
           }
         ];
-      } else if (model.startsWith("gemma-") || model.startsWith("gemini-")) {
+      } else if (model.startsWith("gemma-")) {
         config.thinkingConfig = {
           thinkingLevel: "MINIMAL"
         };
@@ -18785,7 +18785,7 @@ ELEVATOR PITCH
             googleSearch: {}
           }
         ];
-      } else if (model.startsWith("gemma-") || model.startsWith("gemini-")) {
+      } else if (model.startsWith("gemma-")) {
         config.thinkingConfig = {
           thinkingLevel: "MINIMAL"
         };
