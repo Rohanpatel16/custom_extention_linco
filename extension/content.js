@@ -921,11 +921,11 @@ function checkAndInjectButtons() {
     // Create Linco button
     const lincoBtn = document.createElement('button');
     lincoBtn.type = 'button';
-    lincoBtn.className = 'msg-form__footer-action artdeco-button artdeco-button--tertiary artdeco-button--circle artdeco-button--muted m0 artdeco-button--1 linco-inject-btn';
+    lincoBtn.className = 'msg-form__footer-action artdeco-button artdeco-button--tertiary artdeco-button--circle artdeco-button--muted m0 artdeco-button--2 linco-inject-btn';
     lincoBtn.title = 'Generate AI Reply (Linco)';
     lincoBtn.innerHTML = '✨';
 
-    // Style the button
+    // Style the button to match LinkedIn toolbar size and spacing
     if (targetContainer === leftActions || targetContainer.classList.contains('msg-form__left-actions')) {
       Object.assign(lincoBtn.style, {
         fontSize: '16px',
@@ -934,17 +934,32 @@ function checkAndInjectButtons() {
         justifyContent: 'center',
         cursor: 'pointer',
         border: 'none',
-        background: 'transparent',
+        background: 'linear-gradient(135deg, #6366f1, #0ea5e9)',
+        color: 'white',
         outline: 'none',
         width: '32px',
         height: '32px',
         borderRadius: '50%',
-        margin: '0 4px'
+        margin: '0 4px',
+        boxShadow: '0 2px 8px rgba(99, 102, 241, 0.4)',
+        padding: '0',
+        alignSelf: 'center',
+        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s'
+      });
+
+      // Add hover/active micro-animations
+      lincoBtn.addEventListener('mouseenter', () => {
+        lincoBtn.style.transform = 'scale(1.08)';
+        lincoBtn.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.5)';
+      });
+      lincoBtn.addEventListener('mouseleave', () => {
+        lincoBtn.style.transform = 'scale(1)';
+        lincoBtn.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.3)';
       });
     } else {
       Object.assign(lincoBtn.style, {
         border: 'none',
-        background: 'linear-gradient(135deg, #0a66c2, #004182)',
+        background: 'linear-gradient(135deg, #6366f1, #0ea5e9)',
         color: 'white',
         borderRadius: '50%',
         width: '28px',
@@ -955,8 +970,19 @@ function checkAndInjectButtons() {
         justifyContent: 'center',
         marginRight: '8px',
         boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-        fontSize: '14px',
-        outline: 'none'
+        fontSize: '12px',
+        outline: 'none',
+        transition: 'transform 0.2s, box-shadow 0.2s'
+      });
+
+      // Add hover/active micro-animations for the fallback button ONLY
+      lincoBtn.addEventListener('mouseenter', () => {
+        lincoBtn.style.transform = 'scale(1.1)';
+        lincoBtn.style.boxShadow = '0 4px 10px rgba(99, 102, 241, 0.4)';
+      });
+      lincoBtn.addEventListener('mouseleave', () => {
+        lincoBtn.style.transform = 'scale(1)';
+        lincoBtn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
       });
     }
 
@@ -994,19 +1020,31 @@ function handleLincoBtnClick(editor, container) {
     if (!panel) {
       panel = document.createElement('div');
       panel.className = 'linco-approval-panel';
-      if (isDarkMode()) {
-        panel.classList.add('linco-dark-mode');
-      }
       
       panel.innerHTML = `
         <div class="linco-approval-header">
-          <span>✨ Linco AI Draft</span>
-          <button class="linco-close-btn" type="button">×</button>
+          <div class="linco-logo">
+            <div class="linco-logo-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>
+              </svg>
+            </div>
+            <span class="linco-logo-text">Linco</span>
+          </div>
+          <button class="linco-close-btn" type="button" title="Close AI Draft">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
         <textarea class="linco-approval-textarea" placeholder="Generating reply draft..."></textarea>
         <input class="linco-instruction-input" type="text" placeholder="Add custom context / what you want to say..." />
         <div class="linco-approval-btn-container">
-          <span class="linco-status-msg">Analyzing chat...</span>
+          <div class="linco-status-badge">
+            <span class="linco-status-dot linco-dot-loading"></span>
+            <span class="linco-status-text">Analyzing...</span>
+          </div>
           <button class="linco-btn linco-btn-secondary linco-regen-btn" type="button" disabled>Regenerate</button>
           <button class="linco-btn linco-btn-primary linco-approve-btn" type="button" disabled>Approve & Insert</button>
         </div>
@@ -1017,9 +1055,19 @@ function handleLincoBtnClick(editor, container) {
       container.appendChild(panel);
     }
 
+    // Set dynamic theme class depending on LinkedIn state
+    if (isDarkMode()) {
+      panel.classList.add('linco-dark-mode');
+      panel.classList.remove('linco-light-mode');
+    } else {
+      panel.classList.add('linco-light-mode');
+      panel.classList.remove('linco-dark-mode');
+    }
+
     const textarea = panel.querySelector('.linco-approval-textarea');
     const instructionInput = panel.querySelector('.linco-instruction-input');
-    const statusMsg = panel.querySelector('.linco-status-msg');
+    const statusDot = panel.querySelector('.linco-status-dot');
+    const statusText = panel.querySelector('.linco-status-text');
     const regenBtn = panel.querySelector('.linco-regen-btn');
     const approveBtn = panel.querySelector('.linco-approve-btn');
     const closeBtn = panel.querySelector('.linco-close-btn');
@@ -1029,7 +1077,8 @@ function handleLincoBtnClick(editor, container) {
     approveBtn.disabled = true;
     textarea.disabled = true;
     if (instructionInput) instructionInput.disabled = true;
-    statusMsg.textContent = "Extracting chat history...";
+    statusDot.className = 'linco-status-dot linco-dot-loading';
+    statusText.textContent = "Extracting...";
 
     const closePanel = () => {
       panel.remove();
@@ -1041,7 +1090,8 @@ function handleLincoBtnClick(editor, container) {
     };
 
     const generateDraft = async (customInstruction) => {
-      statusMsg.textContent = "Generating draft...";
+      statusDot.className = 'linco-status-dot linco-dot-loading';
+      statusText.textContent = "Generating...";
       regenBtn.disabled = true;
       approveBtn.disabled = true;
       textarea.disabled = true;
@@ -1110,14 +1160,16 @@ Output: "Awesome. We have a few vetted UX designers ready to start. Would you be
         if (instructionInput) {
           instructionInput.disabled = false;
         }
-        statusMsg.textContent = "Draft ready.";
+        statusDot.className = 'linco-status-dot linco-dot-success';
+        statusText.textContent = "Draft ready.";
         regenBtn.disabled = false;
         approveBtn.disabled = false;
       } catch (err) {
         console.error('[Linco] Generation failed:', err);
         textarea.value = '';
         textarea.placeholder = `Failed to generate: ${err.message}`;
-        statusMsg.textContent = "Error.";
+        statusDot.className = 'linco-status-dot linco-dot-error';
+        statusText.textContent = "Error.";
         regenBtn.disabled = false;
         if (instructionInput) instructionInput.disabled = false;
       }
@@ -1320,166 +1372,390 @@ async function callGeminiAPI(apiKey, model, promptText) {
 // Inject CSS Styles for Linco Approval Box
 const lincoStyle = document.createElement('style');
 lincoStyle.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
+
   .linco-approval-panel {
+    /* Design Tokens (Dark Theme by default) */
+    --linco-h: 224;
+    --linco-s: 30%;
+    
+    --linco-bg-base: hsl(var(--linco-h), 30%, 6%);
+    --linco-bg-surface: hsl(var(--linco-h), 28%, 10%);
+    --linco-bg-card: hsl(var(--linco-h), 25%, 14%);
+    --linco-bg-hover: hsl(var(--linco-h), 24%, 18%);
+    
+    --linco-accent-primary: #6366f1; /* Vibrant Indigo */
+    --linco-accent-secondary: #0ea5e9; /* Cyan */
+    --linco-accent-glow: rgba(99, 102, 241, 0.3);
+    --linco-accent-gradient: linear-gradient(135deg, var(--linco-accent-primary) 0%, var(--linco-accent-secondary) 100%);
+    
+    --linco-success: #10b981;
+    --linco-error: #ef4444;
+    --linco-warning: #f59e0b;
+    
+    --linco-text-primary: hsl(var(--linco-h), 20%, 95%);
+    --linco-text-secondary: hsl(var(--linco-h), 15%, 75%);
+    --linco-text-muted: hsl(var(--linco-h), 12%, 50%);
+    
+    --linco-border: rgba(255, 255, 255, 0.08);
+    --linco-border-accent: rgba(99, 102, 241, 0.25);
+    
+    --linco-radius-sm: 8px;
+    --linco-radius-md: 12px;
+    --linco-radius-lg: 16px;
+    
+    --linco-font-display: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+    --linco-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    
+    --linco-transition: 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    --linco-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --linco-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+    
+    /* Input contrast background (defaults to dark base) */
+    --linco-input-bg: var(--linco-bg-base);
+
+    /* Positioning and Core Styles */
     position: absolute;
-    bottom: 80px;
+    bottom: 85px;
     left: 8px;
     right: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12);
-    z-index: 10000;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    box-sizing: border-box;
-    animation: linco-slide-up 0.25s ease-out;
+    background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.05) 0%, transparent 60%),
+                var(--linco-bg-surface) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--linco-border) !important;
+    border-radius: var(--linco-radius-lg) !important;
+    box-shadow: var(--linco-shadow-md) !important;
+    z-index: 10000 !important;
+    padding: 14px 16px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    font-family: var(--linco-font-body) !important;
+    box-sizing: border-box !important;
+    animation: linco-slide-up var(--linco-transition) ease-out;
+    transition: background var(--linco-transition), border var(--linco-transition), box-shadow var(--linco-transition);
   }
   
-  .linco-dark-mode.linco-approval-panel {
-    background: rgba(30, 30, 35, 0.9) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+  .linco-approval-panel.linco-light-mode {
+    /* Light Theme Overrides */
+    --linco-bg-base: #f3f4f6;
+    --linco-bg-surface: #ffffff;
+    --linco-bg-card: #f9fafb;
+    --linco-bg-hover: #e5e7eb;
+    
+    --linco-text-primary: #111827;
+    --linco-text-secondary: #4b5563;
+    --linco-text-muted: #9ca3af;
+    
+    --linco-border: rgba(0, 0, 0, 0.08);
+    --linco-border-accent: rgba(99, 102, 241, 0.2);
+    --linco-accent-glow: rgba(99, 102, 241, 0.15);
+    
+    --linco-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+    --linco-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+    
+    /* Input background in light mode (contrasting light grey) */
+    --linco-input-bg: #e5e7eb;
   }
   
   .linco-approval-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 700;
-    font-size: 13px;
-    color: #111;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid var(--linco-border) !important;
+    background: transparent !important;
   }
   
-  .linco-dark-mode .linco-approval-header {
-    color: #eee !important;
+  .linco-logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  
+  .linco-logo-icon {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 6px !important;
+    background: var(--linco-accent-gradient) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 0 10px var(--linco-accent-glow) !important;
+  }
+  
+  .linco-logo-text {
+    font-family: var(--linco-font-display) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    background: var(--linco-accent-gradient) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
   }
   
   .linco-close-btn {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-    color: #666;
-    padding: 0;
-    margin: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    border: 1px solid var(--linco-border) !important;
+    background: transparent !important;
+    color: var(--linco-text-secondary) !important;
+    cursor: pointer !important;
+    transition: var(--linco-transition) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    outline: none !important;
   }
   
-  .linco-dark-mode .linco-close-btn {
-    color: #aaa !important;
+  .linco-close-btn:hover {
+    background: var(--linco-bg-hover) !important;
+    color: var(--linco-text-primary) !important;
+    border-color: var(--linco-border-accent) !important;
+    box-shadow: 0 0 8px var(--linco-accent-glow) !important;
   }
   
-  .linco-approval-textarea {
-    width: 100%;
-    height: 90px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 13px;
-    line-height: 1.4;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-    color: #333;
-    box-sizing: border-box;
+  .linco-approval-panel .linco-approval-textarea {
+    width: 100% !important;
+    height: 90px !important;
+    background: var(--linco-input-bg) !important;
+    background-color: var(--linco-input-bg) !important;
+    border: 1px solid var(--linco-border) !important;
+    border-radius: var(--linco-radius-sm) !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    font-family: var(--linco-font-body) !important;
+    resize: none !important;
+    outline: none !important;
+    color: var(--linco-text-primary) !important;
+    box-sizing: border-box !important;
+    transition: var(--linco-transition) !important;
   }
   
-  .linco-dark-mode .linco-approval-textarea {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
-    color: #ddd !important;
+  .linco-approval-panel .linco-approval-textarea:focus,
+  .linco-approval-panel .linco-approval-textarea:active {
+    background: var(--linco-input-bg) !important;
+    background-color: var(--linco-input-bg) !important;
+    color: var(--linco-text-primary) !important;
+    border-color: var(--linco-border-accent) !important;
+    box-shadow: 0 0 0 3px var(--linco-accent-glow) !important;
+    outline: none !important;
+  }
+  
+  .linco-approval-panel .linco-approval-textarea:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+  }
+  
+  .linco-approval-panel .linco-approval-textarea::placeholder {
+    color: var(--linco-text-muted) !important;
   }
 
-  .linco-instruction-input {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
-    padding: 6px 8px;
-    font-size: 12px;
-    font-family: inherit;
-    outline: none;
-    color: #333;
-    box-sizing: border-box;
+  .linco-approval-panel .linco-instruction-input {
+    width: 100% !important;
+    background: var(--linco-input-bg) !important;
+    background-color: var(--linco-input-bg) !important;
+    border: 1px solid var(--linco-border) !important;
+    border-radius: var(--linco-radius-sm) !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    font-family: var(--linco-font-body) !important;
+    outline: none !important;
+    color: var(--linco-text-primary) !important;
+    box-sizing: border-box !important;
+    transition: var(--linco-transition) !important;
   }
   
-  .linco-dark-mode .linco-instruction-input {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
-    color: #ddd !important;
+  .linco-approval-panel .linco-instruction-input:focus,
+  .linco-approval-panel .linco-instruction-input:active {
+    background: var(--linco-input-bg) !important;
+    background-color: var(--linco-input-bg) !important;
+    color: var(--linco-text-primary) !important;
+    border-color: var(--linco-border-accent) !important;
+    box-shadow: 0 0 0 3px var(--linco-accent-glow) !important;
+    outline: none !important;
+  }
+  
+  .linco-approval-panel .linco-instruction-input:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+  }
+  
+  .linco-approval-panel .linco-instruction-input::placeholder {
+    color: var(--linco-text-muted) !important;
   }
   
   .linco-approval-btn-container {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 8px;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-top: 2px !important;
+  }
+  
+  .linco-status-badge {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    height: 32px !important;
+    padding: 0 10px !important;
+    background: var(--linco-bg-surface) !important;
+    border: 1px solid var(--linco-border) !important;
+    border-radius: 99px !important;
+    margin-right: auto !important;
+    box-sizing: border-box !important;
+    transition: var(--linco-transition) !important;
+  }
+  
+  .linco-status-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+    transition: var(--linco-transition) !important;
+  }
+  
+  .linco-dot-idle {
+    background: var(--linco-text-muted) !important;
+  }
+  
+  .linco-dot-loading {
+    background: var(--linco-warning) !important;
+    animation: linco-pulse-dot 1s ease-in-out infinite !important;
+  }
+  
+  .linco-dot-success {
+    background: var(--linco-success) !important;
+    box-shadow: 0 0 6px var(--linco-success) !important;
+  }
+  
+  .linco-dot-error {
+    background: var(--linco-error) !important;
+    box-shadow: 0 0 6px var(--linco-error) !important;
+  }
+  
+  .linco-status-text {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: var(--linco-text-secondary) !important;
+    font-family: var(--linco-font-body) !important;
+  }
+  
+  @keyframes linco-pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.8); }
   }
   
   .linco-btn {
+    height: 32px !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    font-size: 12px !important;
+    border-radius: var(--linco-radius-sm) !important;
+    cursor: pointer !important;
+    transition: var(--linco-transition) !important;
+    outline: none !important;
     border: none;
-    border-radius: 16px;
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-    outline: none;
   }
   
   .linco-btn-primary {
-    background: linear-gradient(135deg, #0a66c2, #004182);
-    color: white;
+    gap: 8px !important;
+    padding: 0 14px !important;
+    font-family: var(--linco-font-display) !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    background: var(--linco-accent-gradient) !important;
+    box-shadow: 0 2px 10px var(--linco-accent-glow) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border: 1px solid transparent !important;
   }
   
-  .linco-btn-primary:hover {
-    background: linear-gradient(135deg, #004182, #002244);
+  .linco-btn-primary::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(
+      120deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    ) !important;
+    transition: all 600ms !important;
+  }
+  
+  .linco-btn-primary:hover:not(:disabled)::before {
+    left: 100% !important;
+  }
+  
+  .linco-btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45) !important;
+  }
+  
+  .linco-btn-primary:active:not(:disabled) {
+    transform: translateY(1px) !important;
   }
   
   .linco-btn-primary:disabled {
-    background: #ccc;
-    color: #888;
-    cursor: not-allowed;
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
   }
   
   .linco-btn-secondary {
-    background: rgba(0, 0, 0, 0.05);
-    color: #555;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    gap: 8px !important;
+    padding: 0 14px !important;
+    font-family: var(--linco-font-display) !important;
+    font-weight: 700 !important;
+    background: rgba(99, 102, 241, 0.08) !important;
+    color: var(--linco-accent-primary) !important;
+    border: 1px solid rgba(99, 102, 241, 0.3) !important;
+    box-shadow: none !important;
   }
   
   .linco-dark-mode .linco-btn-secondary {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: #ccc !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-  }
-  
-  .linco-btn-secondary:disabled {
-    background: rgba(0, 0, 0, 0.02);
-    color: #aaa;
-    border-color: rgba(0, 0, 0, 0.05);
-    cursor: not-allowed;
-  }
-  
-  .linco-dark-mode .linco-btn-secondary:disabled {
-    background: rgba(255, 255, 255, 0.02) !important;
-    color: #555 !important;
-    border-color: rgba(255, 255, 255, 0.05) !important;
+    background: rgba(99, 102, 241, 0.15) !important;
+    color: var(--linco-text-primary) !important;
+    border-color: rgba(99, 102, 241, 0.4) !important;
   }
   
   .linco-btn-secondary:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(99, 102, 241, 0.15) !important;
+    color: var(--linco-accent-primary) !important;
+    border-color: var(--linco-accent-primary) !important;
+    transform: translateY(-1px) !important;
   }
   
   .linco-dark-mode .linco-btn-secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.15) !important;
+    background: rgba(99, 102, 241, 0.25) !important;
+    color: var(--linco-text-primary) !important;
+    border-color: var(--linco-accent-primary) !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  .linco-btn-secondary:active:not(:disabled) {
+    transform: translateY(1px) !important;
+  }
+  
+  .linco-btn-secondary:disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
   }
   
   .linco-status-msg {
